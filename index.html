@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>会話練習</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for multi-select and improved aesthetics */
+        select[multiple] {
+            height: 150px;
+            width: 200px;
+            background-color: #f9fafb;
+            border-radius: 0.5rem;
+            padding: 0.5rem;
+        }
+        select[multiple] option {
+            padding: 0.25rem;
+        }
+        select[multiple] option:checked {
+            background-color: #4f46e5;
+            color: white;
+        }
+        .gradient-bg {
+            background: linear-gradient(to bottom right, #e0f2fe, #e0e7ff);
+        }
+        .question-card {
+            transition: all 0.3s ease;
+        }
+        .question-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        /* Hide question text by default */
+        .question-text {
+            display: none;
+        }
+    </style>
+</head>
+<body class="gradient-bg font-sans min-h-screen">
+    <div class="container mx-auto p-6">
+        <h1 class="text-4xl font-extrabold text-center text-indigo-800 mb-8">会話練習</h1>
+        
+        <!-- Playback Controls -->
+        <div class="mb-8 flex justify-center space-x-4">
+            <button id="playAllBtn" class="bg-teal-500 text-white px-6 py-3 rounded-lg hover:bg-teal-600 transition duration-200 shadow-md">Chọn tất cả</button>
+            <button id="playLessonBtn" class="bg-indigo-500 text-white px-6 py-3 rounded-lg hover:bg-indigo-600 transition duration-200 shadow-md">Chọn bài</button>
+            <button id="stopBtn" class="bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 transition duration-200 shadow-md">Dừng</button>
+        </div>
+
+        <!-- Lesson Selection (hidden by default) -->
+        <div id="lessonSelectContainer" class="hidden mb-8 flex justify-center space-x-4">
+            <select id="lessonSelect" multiple class="border border-gray-300 focus:ring-2 focus:ring-indigo-500">
+            </select>
+            <button id="confirmBtn" class="bg-teal-500 text-white px-4 py-2 rounded-lg hover:bg-teal-600 transition duration-200 shadow-md">Hiển thị</button>
+        </div>
+
+        <!-- Error Message Container -->
+        <div id="errorMessage" class="hidden text-red-600 text-center mb-6 bg-red-100 p-3 rounded-lg"></div>
+
+        <!-- Questions Container -->
+        <div id="questionsContainer" class="space-y-6"></div>
+    </div>
+
+    <script>
+        // Sample question data (replace audioUrl with actual audio file paths)
+        const questions = [
+    { lesson: 23, id: "23-1", text: "Chiều nay anh đi uống cà phê với em không ?", audioUrl: "https://github.com/Hoangthuanitm/Filemp3/raw/refs/heads/main/23-1.mp3" },
+    { lesson: 23, id: "23-2", text: "Chúng ta cùng đi xem phim nhé", audioUrl: "https://github.com/Hoangthuanitm/Filemp3/raw/refs/heads/main/23-2.mp3" },
+    { lesson: 23, id: "23-3", text: "Cuối tuần này mình đi ăn nhé", audioUrl: "https://github.com/Hoangthuanitm/Filemp3/raw/refs/heads/main/23-3.mp3" },
+    { lesson: 23, id: "23-4", text: "Bạn giúp tôi mở cửa ra được không?", audioUrl: "https://github.com/Hoangthuanitm/Filemp3/raw/refs/heads/main/23-4.mp3" },
+    { lesson: 23, id: "23-5", text: "Bánh này ngon ha", audioUrl: "https://github.com/Hoangthuanitm/Filemp3/raw/refs/heads/main/23-5.mp3" },
+    { lesson: 23, id: "23-6", text: "Mình cùng ăn trưa nha", audioUrl: "https://github.com/Hoangthuanitm/Filemp3/raw/refs/heads/main/23-6.mp3" },
+    { lesson: 24, id: "24-1", text: "Bạn thích ăn món gì nhất?", audioUrl: "https://github.com/Hoangthuanitm/Filemp3/raw/refs/heads/main/24-1.mp3" },
+    { lesson: 24, id: "24-2", text: "Bạn thích làm gì vào thời gian rảnh", audioUrl: "https://github.com/Hoangthuanitm/Filemp3/raw/refs/heads/main/24-2.mp3" },
+    { lesson: 24, id: "24-3", text: "Bạn có biết nói tiếng anh không?", audioUrl: "https://github.com/Hoangthuanitm/Filemp3/raw/refs/heads/main/24-3.mp3" },
+    { lesson: 24, id: "24-4", text: "Bạn giỏi môn thể thao nào nhất?", audioUrl: "https://github.com/Hoangthuanitm/Filemp3/raw/refs/heads/main/24-4.mp3" },
+    { lesson: 24, id: "24-5", text: "Bạn không thích món ăn nào?", audioUrl: "https://github.com/Hoangthuanitm/Filemp3/raw/refs/heads/main/24-5.mp3" },
+    { lesson: 24, id: "24-6", text: "Bạn chơi môn thể thao nào?", audioUrl: "https://github.com/Hoangthuanitm/Filemp3/raw/refs/heads/main/24-6.mp3" },
+        ];
+
+        // Initialize variables
+        const lessonSelect = document.getElementById('lessonSelect');
+        const confirmBtn = document.getElementById('confirmBtn');
+        const playAllBtn = document.getElementById('playAllBtn');
+        const playLessonBtn = document.getElementById('playLessonBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const lessonSelectContainer = document.getElementById('lessonSelectContainer');
+        const questionsContainer = document.getElementById('questionsContainer');
+        const errorMessage = document.getElementById('errorMessage');
+        let currentAudio = null;
+        let isPlaying = false;
+        let audioQueue = [];
+
+        // Populate lesson select options
+        const uniqueLessons = [...new Set(questions.map(q => q.lesson))].sort((a, b) => a - b);
+        uniqueLessons.forEach(lesson => {
+            const option = document.createElement('option');
+            option.value = lesson;
+            option.textContent = `Bài ${lesson}`;
+            lessonSelect.appendChild(option);
+        });
+
+        // Function to display questions
+        function displayQuestions(selectedLessons) {
+            questionsContainer.innerHTML = '';
+            const filteredQuestions = selectedLessons.length > 0 
+                ? questions.filter(q => selectedLessons.includes(q.lesson))
+                : questions;
+
+            filteredQuestions.forEach((question, index) => {
+                const questionDiv = document.createElement('div');
+                questionDiv.className = 'question-card bg-white p-6 rounded-lg shadow-md flex items-center justify-between';
+                questionDiv.innerHTML = `
+                    <div class="flex items-center space-x-4">
+                        <span class="text-lg font-semibold text-indigo-600">${question.id}</span>
+                        <span class="question-text text-gray-800">${question.text}</span>
+                    </div>
+                    <button class="play-btn bg-teal-500 text-white px-4 py-2 rounded-lg hover:bg-teal-600 transition duration-200" data-audio="${question.audioUrl}">
+                        <svg class="w-6 h-6 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7V5z"></path>
+                        </svg>
+                    </button>
+                `;
+                questionsContainer.appendChild(questionDiv);
+            });
+
+            // Add event listeners to play buttons
+            document.querySelectorAll('.play-btn').forEach(button => {
+                button.addEventListener('click', () => {
+                    const audioUrl = button.getAttribute('data-audio');
+                    playAudio(audioUrl, button);
+                });
+            });
+        }
+
+        // Function to play audio
+        function playAudio(audioUrl, button) {
+            if (currentAudio) {
+                currentAudio.pause();
+                isPlaying = false;
+                document.querySelectorAll('.play-btn').forEach(btn => {
+                    btn.innerHTML = `
+                        <svg class="w-6 h-6 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7V5z"></path>
+                        </svg>
+                    `;
+                });
+            }
+
+            if (currentAudio && currentAudio.src === audioUrl) {
+                currentAudio = null;
+                return;
+            }
+
+            currentAudio = new Audio(audioUrl);
+            currentAudio.play().then(() => {
+                isPlaying = true;
+                button.innerHTML = `
+                    <svg class="w-6 h-6 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6"></path>
+                    </svg>
+                `;
+                currentAudio.onended = () => {
+                    isPlaying = false;
+                    button.innerHTML = `
+                        <svg class="w-6 h-6 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7V5z"></path>
+                        </svg>
+                    `;
+                    currentAudio = null;
+                    playNextInQueue();
+                };
+            }).catch(err => {
+                showError(`Không thể phát âm thanh: ${err.message}`);
+            });
+        }
+
+        // Function to play all audios in sequence
+        function playAllAudios() {
+            if (isPlaying) return;
+            const buttons = document.querySelectorAll('.play-btn');
+            audioQueue = Array.from(buttons).map(btn => btn.getAttribute('data-audio'));
+            if (audioQueue.length === 0) {
+                showError('Không có câu hỏi nào được chọn để phát.');
+                return;
+            }
+            playNextInQueue();
+        }
+
+        // Function to play next audio in queue
+        function playNextInQueue() {
+            if (audioQueue.length > 0) {
+                const nextAudioUrl = audioQueue.shift();
+                const button = document.querySelector(`.play-btn[data-audio="${nextAudioUrl}"]`);
+                playAudio(nextAudioUrl, button);
+            }
+        }
+
+        // Function to show error message
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.classList.remove('hidden');
+            setTimeout(() => {
+                errorMessage.classList.add('hidden');
+            }, 3000);
+        }
+
+        // Event listeners
+        playAllBtn.addEventListener('click', () => {
+            if (!isPlaying) {
+                playAllAudios();
+            }
+        });
+
+        playLessonBtn.addEventListener('click', () => {
+            lessonSelectContainer.classList.toggle('hidden');
+            if (!lessonSelectContainer.classList.contains('hidden')) {
+                lessonSelect.focus();
+            }
+        });
+
+        confirmBtn.addEventListener('click', () => {
+            const selectedLessons = Array.from(lessonSelect.selectedOptions).map(option => parseInt(option.value));
+            if (selectedLessons.length === 0) {
+                showError('Vui lòng chọn ít nhất một bài học.');
+                return;
+            }
+            displayQuestions(selectedLessons);
+            lessonSelectContainer.classList.add('hidden');
+        });
+
+        stopBtn.addEventListener('click', () => {
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio = null;
+                isPlaying = false;
+                audioQueue = [];
+                document.querySelectorAll('.play-btn').forEach(btn => {
+                    btn.innerHTML = `
+                        <svg class="w-6 h-6 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7V5z"></path>
+                        </svg>
+                    `;
+                });
+            }
+        });
+
+        // Initial display of all questions
+        displayQuestions([]);
+    </script>
+</body>
+</html>
